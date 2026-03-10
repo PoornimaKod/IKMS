@@ -1,23 +1,33 @@
-"""Service layer for handling QA requests.
+"""Service layer for wrapping the conversational QA graph.
 
-This module provides a simple interface for the FastAPI layer to interact
-with the multi-agent RAG pipeline without depending directly on LangGraph
-or agent implementation details.
+Feature 5: history and conversation_summary are threaded through.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict, List, Optional
 
 from ..core.agents.graph import run_qa_flow
 
 
-def answer_question(question: str, history: list[dict] = None) -> Dict[str, Any]:
-    """Run the multi-agent QA flow for a given question.
+def answer_question(
+    question: str,
+    history: Optional[List[dict]] = None,
+    conversation_summary: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run the conversational multi-agent QA flow.
 
     Args:
-        question: User's natural language question about the vector databases paper.
-        history: Optional list of previous turn dictionaries.
+        question: The user's current question.
+        history: Previous conversation turns for this session.
+        conversation_summary: Compressed summary for long histories.
+        session_id: Optional session identifier.
 
     Returns:
-        Dictionary containing at least `answer` and `context` keys.
+        Final state dict containing answer, context, and updated history fields.
     """
-    return run_qa_flow(question, history)
+    return run_qa_flow(
+        question=question,
+        history=history,
+        conversation_summary=conversation_summary,
+        session_id=session_id,
+    )

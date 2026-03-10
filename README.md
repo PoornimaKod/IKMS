@@ -1,78 +1,134 @@
-# Class 12 Multi-Agent RAG Demo (IKMS)
+# IKMS — Conversational Multi-Agent RAG
 
-This project is a **FastAPI** application designed to demonstrate a **Multi-Agent RAG (Retrieval-Augmented Generation)** pipeline. It allows users to upload PDF documents (specifically vector database papers), index them into a **Pinecone** vector store, and ask questions about the content.
+> **Feature 5: Conversational Multi-Turn QA with Memory**  
+> Built on LangGraph + Pinecone + FastAPI with a React/Vite frontend.
 
 ## Features
 
--   **Question Answering**: Ask natural language questions about the indexed documents.
--   **Session History**: Supports conversational memory via `session_id`.
--   **PDF Indexing**: Upload and index PDF files directly via the API.
--   **Static UI**: Includes a simple static frontend for interaction.
+- **Multi-turn conversations** — follow-up questions using "it", "that", "the method" are resolved automatically
+-  **Memory summarization** — conversations > 5 turns are auto-compressed to stay within token limits
+-  **History-aware retrieval** — the retrieval agent searches for complementary context, not duplicate info
+-  **PDF upload** — index new documents into Pinecone at runtime
+-  **Vercel-compatible** — stateless API, history stored client-side (localStorage)
 
-## Tech Stack
+## Architecture
 
--   **Backend**: Python, FastAPI
--   **Vector Store**: Pinecone
--   **LLM Orchestration**: LangChain, LangGraph
--   **PDF Processing**: PyPDF
+```
+Frontend (React/Vite)
+  └─ sends: { question, history, conversation_summary, session_id }
+  └─ receives: { answer, context, updated_history, conversation_summary }
+  └─ persists session to localStorage
 
-## Installation
+Backend (FastAPI + LangGraph)
+  └─ retrieval_node     → history-aware vector search
+  └─ summarization_node → builds on prior answers
+  └─ verification_node  → checks consistency with history
+  └─ memory_summarizer  → compresses history > 5 turns
+```
 
-### Prerequisites
+## Environment Variables
 
--   Python 3.11 or higher
--   Pinecone API Key
+Create a `.env` file in the project root (or set in Vercel dashboard):
 
-### Setup
+```
+OPENAI_API_KEY=sk-...
+PINECONE_API_KEY=...
+PINECONE_INDEX_NAME=your-index-name
+```
 
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository_url>
-    cd <repository_name>
-    ```
+## Local Development
 
-2.  **Create and activate a virtual environment**:
-    ```bash
-    # using uv (recommended)
-    uv venv
-    # or using python
-    python -m venv .venv
-    
-    # Activate script (Windows)
-    .venv\Scripts\activate
-    ```
+### Backend
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-3.  **Install dependencies**:
-    ```bash
-    # using uv
-    uv sync
-    # or using pip
-    pip install .
-    ```
+# Start FastAPI dev server (port 8000)
+uvicorn src.app.api:app --reload
+```
 
-4.  **Environment Configuration**:
-    Create a `.env` file in the root directory and add your Pinecone credentials:
-    ```env
-    PINECONE_API_KEY=your_pinecone_api_key
-    PINECONE_ENV=your_pinecone_environment
-    OPENAI_API_KEY=your_openai_api_key
-    ```
+### Frontend
+```bash
+cd frontend
 
-## Usage
+# Install dependencies
+npm install
 
-1.  **Start the server**:
-    ```bash
-    uvicorn src.app.api:app --reload
-    ```
+# Start Vite dev server (port 5173, proxies API to :8000)
+npm run dev
+```
 
-2.  **Access the API Documentation**:
-    Open your browser and navigate to `http://127.0.0.1:8000/docs` to view the interactive API documentation (Swagger UI).
+Open `http://localhost:5173`
 
-3.  **Access the UI**:
-    Navigate to `http://127.0.0.1:8000/static/index.html` (if available) or simply use the root endpoint `http://127.0.0.1:8000/`.
+## Deployment on Vercel
 
-## Endpoints
+### Step 1 — Deploy Backend
 
--   `POST /qa`: Submit a question.
--   `POST /index-pdf`: Upload and index a PDF file.
--   `GET /`: Health check / UI redirection.
+1. Push the root of this repo to GitHub
+2. Go to [vercel.com](https://vercel.com) → **New Project** → import your repo
+3. Set **Root Directory** to `.` (repo root)
+4. Add **Environment Variables**:
+   - `OPENAI_API_KEY` → your OpenAI key
+   - `PINECONE_API_KEY` → your Pinecone key
+   - `PINECONE_INDEX_NAME` → your index name
+5. Deploy → note the URL (e.g. `https://ikms-backend.vercel.app`)
+
+### Step 2 — Deploy Frontend
+
+1. Go to Vercel → **New Project** → import the **same repo**
+2. Set **Root Directory** to `frontend`
+3. Add **Environment Variable**:
+   - `VITE_API_URL` → your backend URL from Step 1 (e.g. `https://ikms-backend.vercel.app`)
+4. Deploy → your frontend URL is live!
+
+### Alternative Backend: Railway or Render
+
+```bash
+# Railway
+railway up
+
+# Render — use Procfile:
+# web: uvicorn src.app.api:app --host 0.0.0.0 --port $PORT
+```
+
+## API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/qa/conversation` | Conversational QA (send history in body) |
+| `POST` | `/index-pdf` | Upload + index a PDF |
+| `GET` | `/health` | Health check |
+| `GET` | `/docs` | Swagger UI |
+
+### Example Request
+
+```json
+POST /qa/conversation
+{
+  "question": "What are its main advantages?",
+  "session_id": "sess_abc123",
+  "history": [
+    {
+      "turn": 1,
+      "question": "What is HNSW indexing?",
+      "answer": "HNSW is...",
+      "timestamp": "2026-02-24T00:00:00Z"
+    }
+  ],
+  "conversation_summary": null
+}
+```
+
+### Example Response
+
+```json
+{
+  "answer": "Compared to other methods, HNSW offers...",
+  "context": "Chunk 1 (page=5): ...",
+  "session_id": "sess_abc123",
+  "turn_number": 2,
+  "used_history": true,
+  "updated_history": [...],
+  "conversation_summary": null
+}
+```

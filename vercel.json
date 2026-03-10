@@ -1,0 +1,23 @@
+{
+    "version": 2,
+    "builds": [
+        {
+            "src": "src/app/api.py",
+            "use": "@vercel/python",
+            "config": {
+                "maxLambdaSize": "50mb"
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "src/app/api.py"
+        }
+    ],
+    "env": {
+        "OPENAI_API_KEY": "@openai_api_key",
+        "PINECONE_API_KEY": "@pinecone_api_key",
+        "PINECONE_INDEX_NAME": "@pinecone_index_name"
+    }
+}

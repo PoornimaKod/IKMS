@@ -24,7 +24,7 @@ def _get_vector_store() -> PineconeVectorStore:
     index = pc.Index(settings.pinecone_index_name)
 
     embeddings = OpenAIEmbeddings(
-        model=settings.openai_embedding_model_name,
+        model=settings.openai_embeddings_model_name,
         api_key=settings.openai_api_key,
     )
 

@@ -1,71 +1,94 @@
-"""LangGraph orchestration for the linear multi-agent QA flow."""
+"""LangGraph orchestration for Feature 5: Conversational Multi-Turn QA with Memory.
 
-from functools import lru_cache
-from typing import Any, Dict
+Graph flow:
+  START → retrieval → summarization → verification → memory_summarizer → END
+"""
+
+import uuid
+from typing import Any, Dict, List, Optional
 
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 
-from .agents import retrieval_node, summarization_node, verification_node
+from .agents import (
+    retrieval_node,
+    summarization_node,
+    verification_node,
+    memory_summarizer_node,
+)
 from .state import QAState
 
 
 def create_qa_graph() -> Any:
-    """Create and compile the linear multi-agent QA graph.
+    """Create and compile the conversational multi-agent QA graph.
 
-    The graph executes in order:
-    1. Retrieval Agent: gathers context from vector store
-    2. Summarization Agent: generates draft answer from context
-    3. Verification Agent: verifies and corrects the answer
+    Flow:
+        retrieval → summarization → verification → memory_summarizer
 
-    Returns:
-        Compiled graph ready for execution.
+    The memory_summarizer compresses history when it exceeds 5 turns.
     """
     builder = StateGraph(QAState)
 
-    # Add nodes for each agent
     builder.add_node("retrieval", retrieval_node)
     builder.add_node("summarization", summarization_node)
     builder.add_node("verification", verification_node)
+    builder.add_node("memory_summarizer", memory_summarizer_node)
 
-    # Define linear flow: START -> retrieval -> summarization -> verification -> END
     builder.add_edge(START, "retrieval")
     builder.add_edge("retrieval", "summarization")
     builder.add_edge("summarization", "verification")
-    builder.add_edge("verification", END)
+    builder.add_edge("verification", "memory_summarizer")
+    builder.add_edge("memory_summarizer", END)
 
     return builder.compile()
 
 
-@lru_cache(maxsize=1)
-def get_qa_graph() -> Any:
-    """Get the compiled QA graph instance (singleton via LRU cache)."""
-    return create_qa_graph()
-
-
-def run_qa_flow(question: str, history: list[dict] = None) -> Dict[str, Any]:
-    """Run the QA graph for a single question.
+def run_conversational_qa_flow(
+    question: str,
+    history: Optional[List[dict]] = None,
+    conversation_summary: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Run the conversational QA graph for a single question turn.
 
     Args:
-        question: The user's question string.
-        history: Optional conversation history.
+        question: The user's current question.
+        history: All previous Q&A turns for this session.
+        conversation_summary: Compressed summary if history was trimmed.
+        session_id: Unique session identifier.
 
     Returns:
-        The final state dict containing the answer and context.
+        Final state dict containing answer, context, updated history, etc.
     """
-    app = create_qa_graph()
-    
+    graph = create_qa_graph()
+
     initial_state: QAState = {
         "question": question,
         "history": history or [],
+        "conversation_summary": conversation_summary,
+        "session_id": session_id or str(uuid.uuid4()),
         "context": None,
-        "conversation_summary": None,
-        "session_id": None,
         "draft_answer": None,
         "answer": None,
     }
 
-    # Run the graph
-    final_state = app.invoke(initial_state)
-
+    final_state = graph.invoke(initial_state)
     return final_state
+
+
+# ---------------------------------------------------------------------------
+# Backwards-compatible wrapper (used by qa_service.py)
+# ---------------------------------------------------------------------------
+def run_qa_flow(
+    question: str,
+    history: Optional[List[dict]] = None,
+    conversation_summary: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Alias for run_conversational_qa_flow — maintains backwards compatibility."""
+    return run_conversational_qa_flow(
+        question=question,
+        history=history,
+        conversation_summary=conversation_summary,
+        session_id=session_id,
+    )
