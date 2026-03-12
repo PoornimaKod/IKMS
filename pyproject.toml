@@ -14,6 +14,3 @@ dependencies = [
     "pypdf>=6.6.0",
     "uvicorn>=0.40.0",
 ]
-
-[project.scripts]
-app = "src.app.api:app"
