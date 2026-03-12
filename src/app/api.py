@@ -87,13 +87,19 @@ async def health():
 # Global exception handler
 # ---------------------------------------------------------------------------
 
+import traceback
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, HTTPException):
         raise exc
+    
+    tb_str = traceback.format_exc()
+    print(tb_str)  # For server logs
+    
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": f"Internal server error: {str(exc)}"},
+        content={"detail": f"Internal server error: {str(exc)}\n{tb_str}"},
     )
 
 
@@ -190,11 +196,15 @@ async def index_pdf(file: UploadFile = File(...)) -> dict:
             detail="Only PDF files are supported.",
         )
 
-    # Use /tmp on serverless environments (like Vercel) to avoid read-only filesystem error
-    upload_dir = Path("/tmp/uploads")
+    import tempfile
+    
+    # Use standard temp directory to ensure compatibility
+    upload_dir = Path(tempfile.gettempdir()) / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    file_path = upload_dir / file.filename
+    # Extract the base file name to prevent any path traversal issues
+    safe_filename = Path(file.filename).name
+    file_path = upload_dir / safe_filename
     contents = await file.read()
     file_path.write_bytes(contents)
 
