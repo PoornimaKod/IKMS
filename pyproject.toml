@@ -6,11 +6,17 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.128.0",
+    "langchain>=1.2.12",
     "langchain-community>=0.4.1",
     "langchain-openai>=1.1.7",
     "langchain-pinecone>=0.2.13",
     "langgraph>=1.0.6",
     "pinecone>=7.3.0",
+    "pydantic-settings>=2.12.0",
     "pypdf>=6.6.0",
+    "python-multipart>=0.0.22",
     "uvicorn>=0.40.0",
 ]
+
+[project.scripts]
+app = "src.app.api:app"
