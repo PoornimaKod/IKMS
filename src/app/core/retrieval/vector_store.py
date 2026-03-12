@@ -79,5 +79,7 @@ def index_documents(file_path: Path) -> int:
     texts = text_splitter.split_documents(docs)
 
     vector_store = _get_vector_store()
-    vector_store.add_documents(texts)
-    return len(texts) 
+    # async_req=False disables Pinecone's internal multiprocessing threadpool
+    # which crashes on Vercel's serverless environment
+    vector_store.add_documents(texts, async_req=False)
+    return len(texts)
