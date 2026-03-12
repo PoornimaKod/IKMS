@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"cd ../ && python -m uvicorn src.app.api:app --reload\""
+    "dev": "concurrently \"vite\" \"cd ../ && python -m uvicorn src.app.api:app --reload\"",
+    "build": "vite build"
   },
   "dependencies": {
     "react": "^18.3.1",
